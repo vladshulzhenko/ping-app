@@ -48,7 +48,7 @@ bot.start(async (ctx) => {
         {
           reply_markup: {
             keyboard: [
-              [{ text: "👥 List All Users" }],
+              [{ text: "👥 List Client Users" }],
               [{ text: "📊 User Statistics" }],
             ],
             resize_keyboard: true,
@@ -57,12 +57,12 @@ bot.start(async (ctx) => {
         }
       );
     } else {
-      // Regular user response - with Mini App button
+      // Regular user response - with Mini App keyboard button
       await ctx.reply(
-        "Welcome to Ping Bot! 👋\n\nClick the button below to open the Mini App:",
+        "Welcome to Ping Bot! 👋\n\nUse the button below to open the Mini App:",
         {
           reply_markup: {
-            inline_keyboard: [
+            keyboard: [
               [
                 {
                   text: "🚀 Open Mini App",
@@ -70,6 +70,8 @@ bot.start(async (ctx) => {
                 },
               ],
             ],
+            resize_keyboard: true,
+            is_persistent: true,
           },
         }
       );
@@ -88,13 +90,12 @@ async function isUserAdmin(chatId: string): Promise<boolean> {
 
 // Helper function to format user info
 function formatUserInfo(user: any, index: number): string {
-  const role = user.role === "ADMINISTRATOR" ? "👨‍💼 Admin" : "👤 Client";
   const name = user.username
     ? `@${user.username}`
     : `${user.firstName || ""} ${user.lastName || ""}`.trim() || "No name";
   const created = new Date(user.createdAt).toLocaleDateString();
 
-  return `${index}. ${role}\n   👤 ${name}\n   🆔 ${user.chatId}\n   📅 ${created}`;
+  return `${index}. 👤 ${name}\n   🆔 ${user.chatId}\n   📅 ${created}`;
 }
 
 // Helper function to create pagination keyboard
@@ -140,7 +141,7 @@ function createPaginationKeyboard(
 }
 
 // Admin command handlers
-bot.hears("👥 List All Users", async (ctx) => {
+bot.hears("👥 List Client Users", async (ctx) => {
   try {
     const chatId = ctx.chat.id.toString();
 
@@ -152,11 +153,11 @@ bot.hears("👥 List All Users", async (ctx) => {
     const result = await userService.getAllUsers(1, 5);
 
     if (result.users.length === 0) {
-      await ctx.reply("📭 No users found in the database.");
+      await ctx.reply("📭 No client users found in the database.");
       return;
     }
 
-    let message = `👥 **User List** (${result.totalCount} total)\n\n`;
+    let message = `👥 **Client Users** (${result.totalCount} total)\n\n`;
 
     result.users.forEach((user, index) => {
       const globalIndex = (result.currentPage - 1) * 5 + index + 1;
@@ -230,11 +231,11 @@ bot.on("callback_query", async (ctx) => {
       const result = await userService.getAllUsers(page, 5);
 
       if (result.users.length === 0) {
-        await ctx.answerCbQuery("📭 No users found on this page");
+        await ctx.answerCbQuery("📭 No client users found on this page");
         return;
       }
 
-      let message = `👥 **User List** (${result.totalCount} total)\n\n`;
+      let message = `👥 **Client Users** (${result.totalCount} total)\n\n`;
 
       result.users.forEach((user, index) => {
         const globalIndex = (result.currentPage - 1) * 5 + index + 1;

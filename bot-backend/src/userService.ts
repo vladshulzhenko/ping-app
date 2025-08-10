@@ -62,11 +62,12 @@ export class UserService {
 
     const [users, totalCount] = await Promise.all([
       prisma.user.findMany({
+        where: { role: UserRole.CLIENT },
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
       }),
-      prisma.user.count(),
+      prisma.user.count({ where: { role: UserRole.CLIENT } }),
     ]);
 
     const totalPages = Math.ceil(totalCount / limit);
