@@ -8,10 +8,10 @@ export const config = {
   miniAppUrl: process.env.MINI_APP_URL!,
   adminChatIds:
     process.env.ADMIN_CHAT_IDS?.split(",").map((id) => id.trim()) || [],
+  paginationLimit: 5,
 };
 
-// Only validate environment variables when they're actually needed
-// This allows scripts like seed.ts to run without requiring all variables
+// Validate environment variables
 export function validateConfig() {
   if (!config.botToken) {
     throw new Error("BOT_TOKEN environment variable is required");
@@ -22,8 +22,6 @@ export function validateConfig() {
   }
 
   if (config.adminChatIds.length === 0) {
-    console.warn(
-      "No admin chat IDs configured. Notifications will not be sent."
-    );
+    throw new Error("ADMIN_CHAT_IDS environment variable is required");
   }
 }

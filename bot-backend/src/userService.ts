@@ -1,4 +1,5 @@
 import prisma from "./database";
+import { config } from "./config";
 
 // User role constants
 export const UserRole = {
@@ -57,7 +58,7 @@ export class UserService {
     });
   }
 
-  async getAllUsers(page: number = 1, limit: number = 5) {
+  async getAllUsers(page: number = 1, limit: number = config.paginationLimit) {
     const skip = (page - 1) * limit;
 
     const [users, totalCount] = await Promise.all([

@@ -68,20 +68,12 @@ function App() {
           // Disable closing confirmation initially
           webApp.disableClosingConfirmation();
 
-          console.log("Telegram WebApp initialized");
-          console.log("Init data:", webApp.initData);
-          console.log("User info:", webApp.initDataUnsafe);
-
           setIsInitialized(true);
         } else {
           // For development/testing outside Telegram
-          console.warn(
-            "Telegram WebApp not available - running in development mode"
-          );
           setIsInitialized(true);
         }
       } catch (error) {
-        console.error("Failed to initialize Telegram Web App:", error);
         setStatusMessage("Failed to initialize app");
         setIsInitialized(true); // Still allow the app to work
       }
@@ -124,11 +116,8 @@ function App() {
           setStatusMessage("Ping sent successfully! 🎉");
           setIsPinging(false);
         }, 1500);
-
-        console.log("Would send ping data:", pingData);
       }
     } catch (error) {
-      console.error("Error sending ping:", error);
       setStatusMessage("Failed to send ping. Please try again.");
       setIsPinging(false);
     }

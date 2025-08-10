@@ -11,10 +11,10 @@ const userService = new UserService();
 // Start the bot
 async function startBot() {
   try {
-    console.log("Starting bot...");
+    console.log("🚀 Starting Ping Bot...");
     await bot.launch();
   } catch (error) {
-    console.error("Failed to start bot:", error);
+    console.error("❌ Failed to start bot:", error);
     process.exit(1);
   }
 }
@@ -77,7 +77,6 @@ bot.start(async (ctx) => {
       );
     }
   } catch (error) {
-    console.error("Error in start command:", error);
     await ctx.reply("Sorry, something went wrong. Please try again.");
   }
 });
@@ -150,29 +149,30 @@ bot.hears("👥 List Client Users", async (ctx) => {
       return;
     }
 
-    const result = await userService.getAllUsers(1, 5);
+    console.log(`👑 Admin ${chatId} accessed user list`);
+
+    const result = await userService.getAllUsers(1);
 
     if (result.users.length === 0) {
       await ctx.reply("📭 No client users found in the database.");
       return;
     }
 
-    let message = `👥 **Client Users** (${result.totalCount} total)\n\n`;
+    let message = `👥 Client Users (${result.totalCount} total)\n\n`;
 
     result.users.forEach((user, index) => {
-      const globalIndex = (result.currentPage - 1) * 5 + index + 1;
+      const globalIndex =
+        (result.currentPage - 1) * config.paginationLimit + index + 1;
       message += formatUserInfo(user, globalIndex) + "\n\n";
     });
 
     await ctx.reply(message, {
-      parse_mode: "Markdown",
       reply_markup: createPaginationKeyboard(
         result.currentPage,
         result.totalPages
       ),
     });
   } catch (error) {
-    console.error("Error listing users:", error);
     await ctx.reply("❌ Error retrieving user list. Please try again.");
   }
 });
@@ -186,17 +186,18 @@ bot.hears("📊 User Statistics", async (ctx) => {
       return;
     }
 
+    console.log(`📊 Admin ${chatId} accessed user statistics`);
+
     const stats = await userService.getUserStats();
 
     const message =
-      `📊 **User Statistics**\n\n` +
+      `📊 User Statistics\n\n` +
       `👥 Total Users: ${stats.totalUsers}\n` +
       `👨‍💼 Administrators: ${stats.adminCount}\n` +
       `👤 Clients: ${stats.clientCount}`;
 
-    await ctx.reply(message, { parse_mode: "Markdown" });
+    await ctx.reply(message);
   } catch (error) {
-    console.error("Error getting user statistics:", error);
     await ctx.reply("❌ Error retrieving statistics. Please try again.");
   }
 });
@@ -228,22 +229,22 @@ bot.on("callback_query", async (ctx) => {
         return;
       }
 
-      const result = await userService.getAllUsers(page, 5);
+      const result = await userService.getAllUsers(page);
 
       if (result.users.length === 0) {
         await ctx.answerCbQuery("📭 No client users found on this page");
         return;
       }
 
-      let message = `👥 **Client Users** (${result.totalCount} total)\n\n`;
+      let message = `👥 Client Users (${result.totalCount} total)\n\n`;
 
       result.users.forEach((user, index) => {
-        const globalIndex = (result.currentPage - 1) * 5 + index + 1;
+        const globalIndex =
+          (result.currentPage - 1) * config.paginationLimit + index + 1;
         message += formatUserInfo(user, globalIndex) + "\n\n";
       });
 
       await ctx.editMessageText(message, {
-        parse_mode: "Markdown",
         reply_markup: createPaginationKeyboard(
           result.currentPage,
           result.totalPages
@@ -255,39 +256,31 @@ bot.on("callback_query", async (ctx) => {
       await ctx.answerCbQuery("📄 Current page");
     }
   } catch (error) {
-    console.error("Error handling callback query:", error);
-    await ctx.answerCbQuery("❌ Error processing request");
+    // Check if it's a "message is not modified" error (common with refresh)
+    if (
+      error instanceof Error &&
+      error.message.includes("message is not modified")
+    ) {
+      await ctx.answerCbQuery("✅ Content is up to date - nothing has changed");
+    } else {
+      await ctx.answerCbQuery("❌ Error processing request");
+    }
   }
 });
 
 bot.on("message", async (ctx) => {
-  console.log("📬 Message received:");
-  console.log("- Message type:", ctx.message);
-  console.log("- WebApp data:", ctx.webAppData);
-  console.log("- Update type:", ctx.updateType);
-  console.log("- Full context keys:", Object.keys(ctx));
-
   const webAppData = ctx.webAppData;
   try {
     if (!webAppData) {
-      console.log("❌ No web app data in this message");
       return;
     }
 
-    console.log("✅ WebApp data found, parsing...");
-
     const dataText = webAppData.data.text();
-    console.log("📦 Raw data text:", dataText);
     const data = JSON.parse(dataText);
-    console.log("📦 Parsed data:", data);
 
     if (data.action === "ping") {
       const user = ctx.from;
       const chatId = ctx.chat.id.toString();
-
-      console.log(`📨 Ping request received from user ${chatId}`);
-
-      const dbUser = await userService.getUserByChatId(chatId);
 
       const userName = user?.username
         ? `@${user.username}`
@@ -299,52 +292,49 @@ bot.on("message", async (ctx) => {
       // Send notification to all admins
       const admins = await userService.getAllAdmins();
       let notificationsSent = 0;
-      let failedAdmins = 0;
 
-      console.log(`📬 Sending notifications to ${admins.length} admin(s)...`);
+      console.log(
+        `📨 Processing ping from user ${chatId}, notifying ${admins.length} admin(s)`
+      );
 
       for (const admin of admins) {
         try {
           await ctx.telegram.sendMessage(admin.chatId, notificationMessage);
           notificationsSent++;
-          console.log(`✅ Notification sent to admin ${admin.chatId}`);
         } catch (error) {
-          failedAdmins++;
-          console.error(
-            `❌ Failed to send notification to admin ${admin.chatId}:`,
-            error
-          );
+          console.error(`❌ Failed to notify admin ${admin.chatId}:`, error);
         }
       }
 
-      // Log the result but don't send confirmation message to user
       if (notificationsSent > 0) {
         console.log(
-          `✅ Ping processed for user ${chatId}: ${notificationsSent}/${admins.length} admins notified`
+          `✅ Ping notification sent to ${notificationsSent}/${admins.length} admin(s)`
         );
       } else {
-        console.log(`❌ Failed to notify any admins for user ${chatId}`);
+        console.error(
+          `❌ Failed to notify any admins for ping from user ${chatId}`
+        );
       }
     }
   } catch (error) {
-    console.error("Error handling web app data:", error);
+    console.error("❌ Error processing WebApp message:", error);
   }
 });
 
 // Error handling
 bot.catch((err, ctx) => {
-  console.error(`Error for ${ctx.updateType}:`, err);
+  console.error(`❌ Bot error for ${ctx.updateType}:`, err);
 });
 
 // Graceful shutdown
 process.once("SIGINT", () => {
-  console.log("Received SIGINT, shutting down gracefully...");
+  console.log("🛑 Received SIGINT, shutting down bot gracefully...");
   bot.stop("SIGINT");
   prisma.$disconnect();
 });
 
 process.once("SIGTERM", () => {
-  console.log("Received SIGTERM, shutting down gracefully...");
+  console.log("🛑 Received SIGTERM, shutting down bot gracefully...");
   bot.stop("SIGTERM");
   prisma.$disconnect();
 });
