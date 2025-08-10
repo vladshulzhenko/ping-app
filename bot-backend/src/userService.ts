@@ -56,4 +56,42 @@ export class UserService {
       where: { role: UserRole.ADMINISTRATOR },
     });
   }
+
+  async getAllUsers(page: number = 1, limit: number = 5) {
+    const skip = (page - 1) * limit;
+
+    const [users, totalCount] = await Promise.all([
+      prisma.user.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count(),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      users,
+      totalCount,
+      currentPage: page,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    };
+  }
+
+  async getUserStats() {
+    const [totalUsers, adminCount, clientCount] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: UserRole.ADMINISTRATOR } }),
+      prisma.user.count({ where: { role: UserRole.CLIENT } }),
+    ]);
+
+    return {
+      totalUsers,
+      adminCount,
+      clientCount,
+    };
+  }
 }

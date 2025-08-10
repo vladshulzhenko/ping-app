@@ -42,9 +42,19 @@ bot.start(async (ctx) => {
     }
 
     if (isAdmin) {
-      // Admin response - no Mini App button
+      // Admin response with admin keyboard
       await ctx.reply(
-        "👨‍💼 Welcome, Admin!\n\n🔔 You will receive ping notifications from users.\n\n📊 Admin features:\n• Receive all ping notifications\n• View user activity\n• No action required from you"
+        "👨‍💼 Welcome, Admin!\n\n🔔 You will receive ping notifications from users.\n\n📊 Admin features:\n• Receive all ping notifications\n• View user activity\n• Manage users",
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: "👥 List All Users" }],
+              [{ text: "📊 User Statistics" }],
+            ],
+            resize_keyboard: true,
+            is_persistent: true,
+          },
+        }
       );
     } else {
       // Regular user response - with Mini App button
@@ -67,6 +77,185 @@ bot.start(async (ctx) => {
   } catch (error) {
     console.error("Error in start command:", error);
     await ctx.reply("Sorry, something went wrong. Please try again.");
+  }
+});
+
+// Helper function to check if user is admin
+async function isUserAdmin(chatId: string): Promise<boolean> {
+  const user = await userService.getUserByChatId(chatId);
+  return user?.role === "ADMINISTRATOR";
+}
+
+// Helper function to format user info
+function formatUserInfo(user: any, index: number): string {
+  const role = user.role === "ADMINISTRATOR" ? "👨‍💼 Admin" : "👤 Client";
+  const name = user.username
+    ? `@${user.username}`
+    : `${user.firstName || ""} ${user.lastName || ""}`.trim() || "No name";
+  const created = new Date(user.createdAt).toLocaleDateString();
+
+  return `${index}. ${role}\n   👤 ${name}\n   🆔 ${user.chatId}\n   📅 ${created}`;
+}
+
+// Helper function to create pagination keyboard
+function createPaginationKeyboard(
+  currentPage: number,
+  totalPages: number
+): any {
+  const keyboard = [];
+
+  if (totalPages > 1) {
+    const row = [];
+
+    if (currentPage > 1) {
+      row.push({
+        text: "⬅️ Previous",
+        callback_data: `users_page_${currentPage - 1}`,
+      });
+    }
+
+    row.push({
+      text: `${currentPage}/${totalPages}`,
+      callback_data: "users_current_page",
+    });
+
+    if (currentPage < totalPages) {
+      row.push({
+        text: "Next ➡️",
+        callback_data: `users_page_${currentPage + 1}`,
+      });
+    }
+
+    keyboard.push(row);
+  }
+
+  keyboard.push([
+    {
+      text: "🔄 Refresh",
+      callback_data: `users_page_${currentPage}`,
+    },
+  ]);
+
+  return { inline_keyboard: keyboard };
+}
+
+// Admin command handlers
+bot.hears("👥 List All Users", async (ctx) => {
+  try {
+    const chatId = ctx.chat.id.toString();
+
+    if (!(await isUserAdmin(chatId))) {
+      await ctx.reply("❌ Access denied. Admin privileges required.");
+      return;
+    }
+
+    const result = await userService.getAllUsers(1, 5);
+
+    if (result.users.length === 0) {
+      await ctx.reply("📭 No users found in the database.");
+      return;
+    }
+
+    let message = `👥 **User List** (${result.totalCount} total)\n\n`;
+
+    result.users.forEach((user, index) => {
+      const globalIndex = (result.currentPage - 1) * 5 + index + 1;
+      message += formatUserInfo(user, globalIndex) + "\n\n";
+    });
+
+    await ctx.reply(message, {
+      parse_mode: "Markdown",
+      reply_markup: createPaginationKeyboard(
+        result.currentPage,
+        result.totalPages
+      ),
+    });
+  } catch (error) {
+    console.error("Error listing users:", error);
+    await ctx.reply("❌ Error retrieving user list. Please try again.");
+  }
+});
+
+bot.hears("📊 User Statistics", async (ctx) => {
+  try {
+    const chatId = ctx.chat.id.toString();
+
+    if (!(await isUserAdmin(chatId))) {
+      await ctx.reply("❌ Access denied. Admin privileges required.");
+      return;
+    }
+
+    const stats = await userService.getUserStats();
+
+    const message =
+      `📊 **User Statistics**\n\n` +
+      `👥 Total Users: ${stats.totalUsers}\n` +
+      `👨‍💼 Administrators: ${stats.adminCount}\n` +
+      `👤 Clients: ${stats.clientCount}`;
+
+    await ctx.reply(message, { parse_mode: "Markdown" });
+  } catch (error) {
+    console.error("Error getting user statistics:", error);
+    await ctx.reply("❌ Error retrieving statistics. Please try again.");
+  }
+});
+
+// Callback query handler for pagination
+bot.on("callback_query", async (ctx) => {
+  try {
+    const callbackQuery = ctx.callbackQuery;
+
+    // Type guard to check if this is a data callback query
+    if (!("data" in callbackQuery)) {
+      await ctx.answerCbQuery("❌ Invalid callback query");
+      return;
+    }
+
+    const callbackData = callbackQuery.data;
+    const chatId = ctx.chat?.id.toString();
+
+    if (!chatId || !(await isUserAdmin(chatId))) {
+      await ctx.answerCbQuery("❌ Access denied");
+      return;
+    }
+
+    if (callbackData?.startsWith("users_page_")) {
+      const page = parseInt(callbackData.replace("users_page_", ""));
+
+      if (isNaN(page) || page < 1) {
+        await ctx.answerCbQuery("❌ Invalid page number");
+        return;
+      }
+
+      const result = await userService.getAllUsers(page, 5);
+
+      if (result.users.length === 0) {
+        await ctx.answerCbQuery("📭 No users found on this page");
+        return;
+      }
+
+      let message = `👥 **User List** (${result.totalCount} total)\n\n`;
+
+      result.users.forEach((user, index) => {
+        const globalIndex = (result.currentPage - 1) * 5 + index + 1;
+        message += formatUserInfo(user, globalIndex) + "\n\n";
+      });
+
+      await ctx.editMessageText(message, {
+        parse_mode: "Markdown",
+        reply_markup: createPaginationKeyboard(
+          result.currentPage,
+          result.totalPages
+        ),
+      });
+
+      await ctx.answerCbQuery(`📄 Page ${page} of ${result.totalPages}`);
+    } else if (callbackData === "users_current_page") {
+      await ctx.answerCbQuery("📄 Current page");
+    }
+  } catch (error) {
+    console.error("Error handling callback query:", error);
+    await ctx.answerCbQuery("❌ Error processing request");
   }
 });
 
