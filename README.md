@@ -204,34 +204,6 @@ export const config = {
 | `MINI_APP_URL`   | ✅       | URL where the mini app is hosted        |
 | `ADMIN_CHAT_IDS` | ✅       | Comma-separated admin Telegram chat IDs |
 
-## 🚀 Deployment
-
-### Development with ngrok (Recommended)
-
-```bash
-# Start your mini app
-cd mini-app && pnpm run dev
-
-# Expose port 5173 (install ngrok first: npm install -g ngrok)
-ngrok http 5173
-```
-
-Use the `https://` URL from ngrok as your `MINI_APP_URL`.
-
-### Backend Deployment
-
-1. Build the application: `pnpm run build`
-2. Set environment variables on your hosting platform
-3. Run database migrations: `pnpm run db:push`
-4. Seed the database: `pnpm run db:seed`
-5. Start the application: `pnpm start`
-
-### Frontend Deployment
-
-1. Build the mini app: `pnpm run build`
-2. Deploy the `dist` folder to your hosting platform
-3. Update the `MINI_APP_URL` environment variable
-
 ## 📝 Logging
 
 The application includes strategic console logging for:
